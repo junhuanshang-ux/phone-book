@@ -323,14 +323,141 @@
                 font-size: 0.9rem;
             }
         }
+
+        #loginPage {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
+
+        .login-card .logo {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        .login-card h2 {
+            font-size: 1.8rem;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .login-card p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .login-form {
+            text-align: left;
+        }
+
+        .login-form label {
+            display: block;
+            font-size: 0.9rem;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .login-form input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            outline: none;
+            margin-bottom: 20px;
+        }
+
+        .login-form input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .login-btn:active {
+            transform: translateY(0);
+        }
+
+        .error-message {
+            color: #e53935;
+            font-size: 0.85rem;
+            margin-top: -15px;
+            margin-bottom: 15px;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .password-hint {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #888;
+            text-align: left;
+        }
+
+        .password-hint strong {
+            color: #666;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>📇 阿坝县干部职工通讯录</h1>
-            <p>全县干部职工联系方式查询系统</p>
-        </header>
+    <div id="loginPage">
+        <div class="login-card">
+            <div class="logo">🔐</div>
+            <h2>通讯录系统</h2>
+            <p>请输入密码以访问通讯录</p>
+            <div class="login-form">
+                <label for="passwordInput">密码</label>
+                <input type="password" id="passwordInput" placeholder="请输入密码" autocomplete="off">
+                <div class="error-message" id="errorMsg">密码错误，请重试</div>
+                <button class="login-btn" id="loginBtn">登录</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="mainContent" style="display: none;">
+        <div class="container">
+            <header>
+                <h1>📇 阿坝县干部职工通讯录</h1>
+                <p>全县干部职工联系方式查询系统</p>
+            </header>
 
         <div class="search-bar">
             <div class="search-row">
@@ -389,6 +516,7 @@
             <span id="pageInfo">第 1 / 1 页</span>
             <button id="nextBtn" disabled>下一页</button>
         </div>
+        </div>
     </div>
 
     <script>
@@ -396,6 +524,57 @@
         let filteredContacts = [];
         let currentPage = 1;
         const pageSize = 24;
+        let storedHash = '';
+
+        async function sha256(message) {
+            const msgBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function initLogin() {
+            try {
+                const response = await fetch('config.json');
+                const config = await response.json();
+                storedHash = config.passwordHash;
+            } catch (e) {
+                console.error('加载配置失败:', e);
+            }
+
+            const loginBtn = document.getElementById('loginBtn');
+            const passwordInput = document.getElementById('passwordInput');
+            const errorMsg = document.getElementById('errorMsg');
+
+            loginBtn.addEventListener('click', handleLogin);
+            passwordInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleLogin();
+                }
+            });
+
+            async function handleLogin() {
+                const inputPassword = passwordInput.value.trim();
+                if (!inputPassword || !storedHash) {
+                    errorMsg.style.display = 'block';
+                    setTimeout(() => { errorMsg.style.display = 'none'; }, 3000);
+                    return;
+                }
+
+                const inputHash = await sha256(inputPassword);
+                if (inputHash === storedHash) {
+                    document.getElementById('loginPage').style.display = 'none';
+                    document.getElementById('mainContent').style.display = 'block';
+                    loadContacts();
+                } else {
+                    errorMsg.style.display = 'block';
+                    passwordInput.value = '';
+                    setTimeout(() => {
+                        errorMsg.style.display = 'none';
+                    }, 3000);
+                }
+            }
+        }
 
         async function loadContacts() {
             try {
@@ -535,7 +714,7 @@
             }).join('');
         }
 
-        loadContacts();
+        initLogin();
     </script>
 </body>
 </html>
